@@ -95,13 +95,8 @@ fun ProfessionalPatientDetailScreen(
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
             )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        },
+        bottomBar = {
             TabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.White,
@@ -152,31 +147,33 @@ fun ProfessionalPatientDetailScreen(
                     text = { Text("Tasks") }
                 )
             }
-
-            Box(modifier = Modifier.fillMaxSize()) {
-                when (selectedTabIndex) {
-                    0 -> InfoTab(
-                        patient = patient,
-                        sessionsCount = sessionsState.sessions.size,
-                        medicationsCount = medicationsState.medications.size,
-                        tasksCount = tasksState.tasks.size
-                    )
-                    1 -> MedicationsTab(
-                        uiState = medicationsState,
-                        onRefresh = { medicationsViewModel.loadMedications(patientId) }
-                    )
-                    2 -> SessionsTab(
-                        uiState = sessionsState,
-                        onRefresh = { sessionsViewModel.loadPatientSessions(patientId) }
-                    )
-                    3 -> TasksTab(
-                        uiState = tasksState,
-                        onToggleStatus = { task ->
-                            tasksViewModel.toggleTaskStatus(task.sessionId, task) { _, _ -> }
-                        },
-                        onRefresh = { tasksViewModel.loadTasksByPatient(patientId) }
-                    )
-                }
+        }
+    ) { padding ->
+        Box(modifier = Modifier
+            .fillMaxSize()
+            .padding(padding)) {
+            when (selectedTabIndex) {
+                0 -> InfoTab(
+                    patient = patient,
+                    sessionsCount = sessionsState.sessions.size,
+                    medicationsCount = medicationsState.medications.size,
+                    tasksCount = tasksState.tasks.size
+                )
+                1 -> MedicationsTab(
+                    uiState = medicationsState,
+                    onRefresh = { medicationsViewModel.loadMedications(patientId) }
+                )
+                2 -> SessionsTab(
+                    uiState = sessionsState,
+                    onRefresh = { sessionsViewModel.loadPatientSessions(patientId) }
+                )
+                3 -> TasksTab(
+                    uiState = tasksState,
+                    onToggleStatus = { task ->
+                        tasksViewModel.toggleTaskStatus(task.sessionId, task) { _, _ -> }
+                    },
+                    onRefresh = { tasksViewModel.loadTasksByPatient(patientId) }
+                )
             }
         }
     }
