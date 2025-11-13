@@ -15,16 +15,21 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Medication
+import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.TaskAlt
+import androidx.compose.material.icons.outlined.Title
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -34,6 +39,8 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
@@ -51,6 +58,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -62,6 +70,7 @@ import com.example.psymed.domain.model.Session
 import com.example.psymed.domain.model.SessionCreateRequest
 import com.example.psymed.domain.model.SessionUpdateRequest
 import com.example.psymed.domain.model.Task
+import com.example.psymed.domain.model.TaskRequest
 import com.example.psymed.ui.analytics.AnalyticsViewModel
 import com.example.psymed.ui.appointments.PatientAppointmentsScreen
 import com.example.psymed.ui.appointments.SessionsViewModel
@@ -197,7 +206,10 @@ fun ProfessionalPatientDetailScreen(
                     onRefresh = { sessionsViewModel.loadPatientSessions(patientId) }
                 )
                 3 -> TasksTab(
+                    patientId = patientId,
+                    sessionsState = sessionsState,
                     uiState = tasksState,
+                    viewModel = tasksViewModel,
                     onToggleStatus = { task ->
                         tasksViewModel.toggleTaskStatus(task.sessionId, task) { _, _ -> }
                     },
@@ -1363,14 +1375,664 @@ private fun DeleteSessionDialog(
 
 @Composable
 private fun TasksTab(
+    patientId: Int,
+    sessionsState: com.example.psymed.ui.appointments.SessionsUiState,
     uiState: com.example.psymed.ui.tasks.TasksUiState,
+    viewModel: TasksViewModel,
     onToggleStatus: (Task) -> Unit,
     onRefresh: () -> Unit
 ) {
-    PatientTasksScreen(
-        modifier = Modifier.fillMaxSize(),
-        uiState = uiState,
-        onToggleStatus = onToggleStatus,
-        onRefresh = onRefresh
+    var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf<Task?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<Task?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            uiState.isLoading && uiState.tasks.isEmpty() -> {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = PsyMedColors.Primary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading tasks...", color = PsyMedColors.TextSecondary)
+                }
+            }
+            uiState.error != null && uiState.tasks.isEmpty() -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.TaskAlt,
+                        contentDescription = null,
+                        tint = Color.Red,
+                        modifier = Modifier.size(60.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Error loading tasks",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = uiState.error,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PsyMedColors.TextSecondary)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onRefresh,
+                        colors = ButtonDefaults.buttonColors(containerColor = PsyMedColors.Primary)
+                    ) {
+                        Text("Retry", color = Color.White)
+                    }
+                }
+            }
+            uiState.tasks.isEmpty() -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.TaskAlt,
+                        contentDescription = null,
+                        tint = PsyMedColors.TextLight,
+                        modifier = Modifier.size(72.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No tasks assigned",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tap the + button to add a task",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PsyMedColors.TextSecondary)
+                    )
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    item(key = "task_progress") {
+                        TaskProgressCard(uiState = uiState)
+                    }
+                    items(uiState.tasks, key = { it.id }) { task ->
+                        ProfessionalTaskCard(
+                            task = task,
+                            sessions = sessionsState.sessions,
+                            onToggleStatus = { onToggleStatus(task) },
+                            onEdit = { showEditDialog = task },
+                            onDelete = { showDeleteDialog = task }
+                        )
+                    }
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = {
+                if (sessionsState.sessions.isEmpty()) {
+                    // Show error - need sessions first
+                } else {
+                    showAddDialog = true
+                }
+            },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = PsyMedColors.Primary
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = "Add task",
+                tint = Color.White
+            )
+        }
+    }
+
+    if (showAddDialog) {
+        if (sessionsState.sessions.isEmpty()) {
+            AlertDialog(
+                onDismissRequest = { showAddDialog = false },
+                title = { Text("No Sessions Available") },
+                text = {
+                    Text("Please create a session before adding tasks.")
+                },
+                confirmButton = {
+                    TextButton(onClick = { showAddDialog = false }) {
+                        Text("OK", color = PsyMedColors.Primary)
+                    }
+                }
+            )
+        } else {
+            AddTaskDialog(
+                sessions = sessionsState.sessions,
+                onDismiss = { showAddDialog = false },
+                onConfirm = { sessionId, title, description ->
+                    viewModel.createTask(
+                        sessionId,
+                        TaskRequest(title = title, description = description)
+                    ) { success, error ->
+                        if (success) {
+                            showAddDialog = false
+                            onRefresh()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    showEditDialog?.let { task ->
+        EditTaskDialog(
+            task = task,
+            sessions = sessionsState.sessions,
+            onDismiss = { showEditDialog = null },
+            onConfirm = { title, description ->
+                viewModel.updateTask(
+                    task.sessionId,
+                    task.id.toIntOrNull() ?: 0,
+                    TaskRequest(title = title, description = description)
+                ) { success, error ->
+                    if (success) {
+                        showEditDialog = null
+                        onRefresh()
+                    }
+                }
+            }
+        )
+    }
+
+    showDeleteDialog?.let { task ->
+        DeleteTaskDialog(
+            task = task,
+            sessions = sessionsState.sessions,
+            onDismiss = { showDeleteDialog = null },
+            onConfirm = {
+                val taskId = task.id.toIntOrNull() ?: 0
+                if (taskId > 0) {
+                    viewModel.deleteTask(task.sessionId, taskId) { success, error ->
+                        if (success) {
+                            showDeleteDialog = null
+                            onRefresh()
+                        }
+                    }
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun TaskProgressCard(uiState: com.example.psymed.ui.tasks.TasksUiState) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                brush = PsyMedColors.PrimaryGradient,
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(20.dp)
+    ) {
+        Text(
+            text = "Task Progress",
+            style = MaterialTheme.typography.titleMedium.copy(
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        Spacer(modifier = Modifier.height(16.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            ProgressStatItem(
+                label = "Completed",
+                value = uiState.completedTasks.size.toString(),
+                icon = Icons.Outlined.CheckCircle
+            )
+            ProgressStatItem(
+                label = "Pending",
+                value = uiState.pendingTasks.size.toString(),
+                icon = Icons.Outlined.Pending
+            )
+            ProgressStatItem(
+                label = "Rate",
+                value = "${uiState.completionRate.toInt()}%",
+                icon = Icons.Outlined.TrendingUp
+            )
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(8.dp)
+                .background(Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(uiState.completionRate.coerceIn(0.0, 100.0).toFloat() / 100f)
+                    .height(8.dp)
+                    .background(Color.White, RoundedCornerShape(8.dp))
+            )
+        }
+    }
+}
+
+@Composable
+private fun ProgressStatItem(label: String, value: String, icon: androidx.compose.ui.graphics.vector.ImageVector) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(28.dp)
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium.copy(
+                color = Color.White,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall.copy(color = Color.White.copy(alpha = 0.8f))
+        )
+    }
+}
+
+@Composable
+private fun ProfessionalTaskCard(
+    task: Task,
+    sessions: List<Session>,
+    onToggleStatus: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val session = sessions.firstOrNull { it.id == task.sessionId }
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        color = if (task.isCompleted) Color(0xFF48BB78).copy(alpha = 0.1f)
+                        else Color(0xFFED8936).copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = if (task.isCompleted) Icons.Outlined.CheckCircle else Icons.Outlined.Pending,
+                    contentDescription = null,
+                    tint = if (task.isCompleted) Color(0xFF48BB78) else Color(0xFFED8936),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = task.title,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (task.isCompleted) PsyMedColors.TextLight else PsyMedColors.Primary
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = task.description,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        color = PsyMedColors.TextSecondary
+                    ),
+                    maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(horizontalAlignment = Alignment.End) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (task.isCompleted) Color(0xFF48BB78).copy(alpha = 0.12f)
+                            else Color(0xFFED8936).copy(alpha = 0.12f)
+                        )
+                        .padding(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text(
+                        text = if (task.isCompleted) "Completed" else "Pending",
+                        style = MaterialTheme.typography.labelMedium.copy(
+                            color = if (task.isCompleted) Color(0xFF2F855A) else Color(0xFFDD6B20),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Edit",
+                            tint = PsyMedColors.Primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "Delete",
+                            tint = Color.Red,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        if (session != null) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.CalendarToday,
+                    contentDescription = null,
+                    tint = PsyMedColors.TextSecondary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = "${dateFormatter.format(session.appointmentDate)} • ${timeFormatter.format(session.appointmentDate)}",
+                    style = MaterialTheme.typography.bodySmall.copy(color = PsyMedColors.TextSecondary)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddTaskDialog(
+    sessions: List<Session>,
+    onDismiss: () -> Unit,
+    onConfirm: (Int, String, String) -> Unit
+) {
+    var selectedSession by remember { mutableStateOf<Session?>(sessions.firstOrNull()) }
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = null,
+                    tint = PsyMedColors.Primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Add Task", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                var expanded by remember { mutableStateOf(false) }
+                Box {
+                    OutlinedTextField(
+                        value = selectedSession?.let {
+                            "${dateFormatter.format(it.appointmentDate)} • ${timeFormatter.format(it.appointmentDate)}"
+                        } ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Session *") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { expanded = true },
+                        leadingIcon = {
+                            Icon(Icons.Outlined.CalendarToday, contentDescription = null)
+                        }
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        sessions.forEach { session ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text("${dateFormatter.format(session.appointmentDate)} • ${timeFormatter.format(session.appointmentDate)}")
+                                },
+                                onClick = {
+                                    selectedSession = session
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(Icons.Outlined.Title, contentDescription = null)
+                    }
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank() && description.isNotBlank() && selectedSession != null) {
+                        onConfirm(selectedSession!!.id, title, description)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PsyMedColors.Primary)
+            ) {
+                Text("Save", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = PsyMedColors.TextSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+private fun EditTaskDialog(
+    task: Task,
+    sessions: List<Session>,
+    onDismiss: () -> Unit,
+    onConfirm: (String, String) -> Unit
+) {
+    var title by remember { mutableStateOf(task.title) }
+    var description by remember { mutableStateOf(task.description) }
+    val session = sessions.firstOrNull { it.id == task.sessionId }
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = null,
+                    tint = PsyMedColors.Primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Edit Task", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = session?.let {
+                        "${dateFormatter.format(it.appointmentDate)} • ${timeFormatter.format(it.appointmentDate)}"
+                    } ?: "Session ${task.sessionId}",
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Session") },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = {
+                        Icon(Icons.Outlined.CalendarToday, contentDescription = null)
+                    },
+                    enabled = false
+                )
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 3
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (title.isNotBlank() && description.isNotBlank()) {
+                        onConfirm(title, description)
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PsyMedColors.Primary)
+            ) {
+                Text("Update", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = PsyMedColors.TextSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteTaskDialog(
+    task: Task,
+    sessions: List<Session>,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val session = sessions.firstOrNull { it.id == task.sessionId }
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = Color.Red,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Delete Task", fontWeight = FontWeight.Bold, color = Color.Red)
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Are you sure you want to delete this task?",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Red.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = task.title,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = PsyMedColors.Primary
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = task.description,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PsyMedColors.TextSecondary),
+                        maxLines = 3,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                    if (session != null) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "${dateFormatter.format(session.appointmentDate)} • ${timeFormatter.format(session.appointmentDate)}",
+                            style = MaterialTheme.typography.bodySmall.copy(color = PsyMedColors.TextSecondary)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "⚠️ This action cannot be undone.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color.Red,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            ) {
+                Text("Delete", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = PsyMedColors.TextSecondary)
+            }
+        }
     )
 }
