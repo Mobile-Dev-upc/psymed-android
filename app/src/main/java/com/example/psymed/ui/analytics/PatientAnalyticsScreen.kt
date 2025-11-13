@@ -101,12 +101,12 @@ private fun AnalyticsContent(
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         moodAnalytic?.let {
-            item {
+            item(key = "mood_distribution") {
                 MoodDistributionCard(moodAnalytic = it)
             }
         }
         if (moodStates.isNotEmpty()) {
-            item {
+            item(key = "mood_entries_title") {
                 SectionTitle("Recent Mood Entries")
             }
             items(moodStates.take(10), key = { it.id }) { mood ->
@@ -115,11 +115,15 @@ private fun AnalyticsContent(
         }
 
         biologicalAnalytic?.let {
-            item { BiologicalAveragesCard(it) }
+            item(key = "biological_averages") {
+                BiologicalAveragesCard(it)
+            }
         }
 
         if (biologicalFunctions.isNotEmpty()) {
-            item { SectionTitle("Recent Physical Entries") }
+            item(key = "biological_entries_title") {
+                SectionTitle("Recent Physical Entries")
+            }
             items(biologicalFunctions.take(10), key = { it.id }) { entry ->
                 BiologicalEntryRow(entry = entry)
             }

@@ -155,7 +155,7 @@ private fun AppointmentsList(
         item {
             RefreshHint(onRefresh = onRefresh)
         }
-        items(sessions) { session ->
+        items(sessions, key = { it.id }) { session ->
             AppointmentCard(
                 session = session,
                 formatterDate = formatterDate,

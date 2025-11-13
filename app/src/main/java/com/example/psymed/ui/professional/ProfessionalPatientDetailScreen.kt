@@ -88,7 +88,7 @@ fun ProfessionalPatientDetailScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item {
+            item(key = "patient_header") {
                 patient?.let {
                     Column {
                         Text(
@@ -108,7 +108,7 @@ fun ProfessionalPatientDetailScreen(
                     }
                 }
             }
-            item {
+            item(key = "appointments_section") {
                 SectionTitle("Appointments")
                 PatientAppointmentsScreen(
                     modifier = Modifier
@@ -118,7 +118,7 @@ fun ProfessionalPatientDetailScreen(
                     onRefresh = { sessionsViewModel.loadPatientSessions(patientId) }
                 )
             }
-            item {
+            item(key = "medications_section") {
                 SectionTitle("Medications")
                 PatientMedicationScreen(
                     modifier = Modifier
@@ -128,7 +128,7 @@ fun ProfessionalPatientDetailScreen(
                     onRefresh = { medicationsViewModel.loadMedications(patientId) }
                 )
             }
-            item {
+            item(key = "tasks_section") {
                 SectionTitle("Tasks")
                 PatientTasksScreen(
                     modifier = Modifier
@@ -141,7 +141,7 @@ fun ProfessionalPatientDetailScreen(
                     onRefresh = { tasksViewModel.loadTasksByPatient(patientId) }
                 )
             }
-            item {
+            item(key = "analytics_section") {
                 SectionTitle("Analytics")
                 PatientAnalyticsScreen(
                     modifier = Modifier
@@ -154,7 +154,9 @@ fun ProfessionalPatientDetailScreen(
                     }
                 )
             }
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+            item(key = "bottom_spacer") {
+                Spacer(modifier = Modifier.height(24.dp))
+            }
         }
     }
 }
