@@ -58,19 +58,28 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.psymed.domain.model.Medication
 import com.example.psymed.domain.model.MedicationRequest
 import com.example.psymed.domain.model.MedicationUpdateRequest
+import com.example.psymed.domain.model.Session
+import com.example.psymed.domain.model.SessionCreateRequest
+import com.example.psymed.domain.model.SessionUpdateRequest
 import com.example.psymed.domain.model.Task
 import com.example.psymed.ui.analytics.AnalyticsViewModel
 import com.example.psymed.ui.appointments.PatientAppointmentsScreen
 import com.example.psymed.ui.appointments.SessionsViewModel
+import com.example.psymed.ui.auth.AuthUiState
 import com.example.psymed.ui.medication.MedicationsViewModel
 import com.example.psymed.ui.tasks.PatientTasksScreen
 import com.example.psymed.ui.tasks.TasksViewModel
 import com.example.psymed.ui.theme.PsyMedColors
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfessionalPatientDetailScreen(
     patientId: Int,
+    authState: AuthUiState,
     viewModel: ProfessionalPatientsViewModel,
     sessionsViewModel: SessionsViewModel,
     medicationsViewModel: MedicationsViewModel,
@@ -181,7 +190,10 @@ fun ProfessionalPatientDetailScreen(
                     onRefresh = { medicationsViewModel.loadMedications(patientId) }
                 )
                 2 -> SessionsTab(
+                    patientId = patientId,
+                    professionalId = authState.professionalProfile?.id,
                     uiState = sessionsState,
+                    viewModel = sessionsViewModel,
                     onRefresh = { sessionsViewModel.loadPatientSessions(patientId) }
                 )
                 3 -> TasksTab(
@@ -842,13 +854,510 @@ private fun DeleteMedicationDialog(
 
 @Composable
 private fun SessionsTab(
+    patientId: Int,
+    professionalId: Int?,
     uiState: com.example.psymed.ui.appointments.SessionsUiState,
+    viewModel: SessionsViewModel,
     onRefresh: () -> Unit
 ) {
-    PatientAppointmentsScreen(
-        modifier = Modifier.fillMaxSize(),
-        uiState = uiState,
-        onRefresh = onRefresh
+    var showAddDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf<Session?>(null) }
+    var showDeleteDialog by remember { mutableStateOf<Session?>(null) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            uiState.isLoading && uiState.sessions.isEmpty() -> {
+                Column(
+                    modifier = Modifier.fillMaxSize(),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    CircularProgressIndicator(color = PsyMedColors.Primary)
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Loading sessions...", color = PsyMedColors.TextSecondary)
+                }
+            }
+            uiState.error != null && uiState.sessions.isEmpty() -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = null,
+                        tint = Color.Red,
+                        modifier = Modifier.size(60.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "Error loading sessions",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = uiState.error,
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PsyMedColors.TextSecondary)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Button(
+                        onClick = onRefresh,
+                        colors = ButtonDefaults.buttonColors(containerColor = PsyMedColors.Primary)
+                    ) {
+                        Text("Retry", color = Color.White)
+                    }
+                }
+            }
+            uiState.sessions.isEmpty() -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = null,
+                        tint = PsyMedColors.TextLight,
+                        modifier = Modifier.size(72.dp)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "No sessions scheduled",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "Tap the + button to schedule a session",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PsyMedColors.TextSecondary)
+                    )
+                }
+            }
+            else -> {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(uiState.sessions, key = { it.id }) { session ->
+                        SessionCard(
+                            session = session,
+                            onEdit = { if (session.isFuture) showEditDialog = session },
+                            onDelete = { showDeleteDialog = session }
+                        )
+                    }
+                }
+            }
+        }
+
+        FloatingActionButton(
+            onClick = { showAddDialog = true },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            containerColor = PsyMedColors.Primary
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Add,
+                contentDescription = "Add session",
+                tint = Color.White
+            )
+        }
+    }
+
+    if (showAddDialog && professionalId != null) {
+        AddSessionDialog(
+            onDismiss = { showAddDialog = false },
+            onConfirm = { dateTime, duration ->
+                viewModel.createSession(
+                    professionalId,
+                    patientId,
+                    SessionCreateRequest(
+                        appointmentDate = dateTime,
+                        sessionTime = duration
+                    )
+                ) { success, error ->
+                    if (success) {
+                        showAddDialog = false
+                        onRefresh()
+                    }
+                }
+            }
+        )
+    }
+
+    showEditDialog?.let { session ->
+        if (professionalId != null) {
+            EditSessionDialog(
+                session = session,
+                onDismiss = { showEditDialog = null },
+                onConfirm = { dateTime, duration ->
+                    viewModel.updateSession(
+                        professionalId,
+                        patientId,
+                        session.id,
+                        SessionUpdateRequest(
+                            appointmentDate = dateTime,
+                            sessionTime = duration
+                        )
+                    ) { success, error ->
+                        if (success) {
+                            showEditDialog = null
+                            onRefresh()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    showDeleteDialog?.let { session ->
+        if (professionalId != null) {
+            DeleteSessionDialog(
+                session = session,
+                onDismiss = { showDeleteDialog = null },
+                onConfirm = {
+                    viewModel.deleteSession(
+                        professionalId,
+                        patientId,
+                        session.id
+                    ) { success, error ->
+                        if (success) {
+                            showDeleteDialog = null
+                            onRefresh()
+                        }
+                    }
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun SessionCard(
+    session: Session,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+    val isPast = !session.isFuture
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color.White, RoundedCornerShape(16.dp))
+            .padding(16.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = Icons.Outlined.CalendarToday,
+                contentDescription = null,
+                tint = if (isPast) PsyMedColors.TextLight else PsyMedColors.Primary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = dateFormatter.format(session.appointmentDate),
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPast) PsyMedColors.TextLight else PsyMedColors.Primary
+                    )
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Outlined.CalendarToday,
+                        contentDescription = null,
+                        tint = if (isPast) PsyMedColors.TextLight else PsyMedColors.TextSecondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = timeFormatter.format(session.appointmentDate),
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = if (isPast) PsyMedColors.TextLight else PsyMedColors.TextSecondary
+                        )
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "${session.sessionTime}h",
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            color = if (isPast) PsyMedColors.TextLight else PsyMedColors.TextSecondary
+                        )
+                    )
+                }
+            }
+            if (!isPast) {
+                Row {
+                    IconButton(onClick = onEdit) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Edit",
+                            tint = PsyMedColors.Primary
+                        )
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(
+                            imageVector = Icons.Outlined.Delete,
+                            contentDescription = "Delete",
+                            tint = Color.Red
+                        )
+                    }
+                }
+            } else {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Delete",
+                        tint = Color.Red
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddSessionDialog(
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDateTime, Double) -> Unit
+) {
+    val defaultDateTime = LocalDateTime.now().plusHours(1)
+    var dateText by remember { mutableStateOf(defaultDateTime.toLocalDate().toString()) }
+    var timeText by remember { mutableStateOf(defaultDateTime.toLocalTime().toString().substring(0, 5)) }
+    var durationText by remember { mutableStateOf("1.0") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = null,
+                    tint = PsyMedColors.Primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Schedule Session", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date (YYYY-MM-DD) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("2024-12-25") }
+                )
+                OutlinedTextField(
+                    value = timeText,
+                    onValueChange = { timeText = it },
+                    label = { Text("Time (HH:mm) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("14:30") }
+                )
+                OutlinedTextField(
+                    value = durationText,
+                    onValueChange = { durationText = it },
+                    label = { Text("Duration (hours) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    placeholder = { Text("1.0") }
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    try {
+                        val date = LocalDate.parse(dateText)
+                        val time = LocalTime.parse(timeText)
+                        val dateTime = LocalDateTime.of(date, time)
+                        val duration = durationText.toDouble()
+                        
+                        if (dateTime.isAfter(LocalDateTime.now()) && duration > 0) {
+                            onConfirm(dateTime, duration)
+                        }
+                    } catch (e: Exception) {
+                        // Invalid input, don't proceed
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PsyMedColors.Primary)
+            ) {
+                Text("Schedule", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = PsyMedColors.TextSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+private fun EditSessionDialog(
+    session: Session,
+    onDismiss: () -> Unit,
+    onConfirm: (LocalDateTime, Double) -> Unit
+) {
+    var dateText by remember { mutableStateOf(session.appointmentDate.toLocalDate().toString()) }
+    var timeText by remember { mutableStateOf(session.appointmentDate.toLocalTime().toString().substring(0, 5)) }
+    var durationText by remember { mutableStateOf(session.sessionTime.toString()) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Edit,
+                    contentDescription = null,
+                    tint = PsyMedColors.Primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Edit Session", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date (YYYY-MM-DD) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = timeText,
+                    onValueChange = { timeText = it },
+                    label = { Text("Time (HH:mm) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = durationText,
+                    onValueChange = { durationText = it },
+                    label = { Text("Duration (hours) *") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    try {
+                        val date = LocalDate.parse(dateText)
+                        val time = LocalTime.parse(timeText)
+                        val dateTime = LocalDateTime.of(date, time)
+                        val duration = durationText.toDouble()
+                        
+                        if (dateTime.isAfter(LocalDateTime.now()) && duration > 0) {
+                            onConfirm(dateTime, duration)
+                        }
+                    } catch (e: Exception) {
+                        // Invalid input, don't proceed
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = PsyMedColors.Primary)
+            ) {
+                Text("Update", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = PsyMedColors.TextSecondary)
+            }
+        }
+    )
+}
+
+@Composable
+private fun DeleteSessionDialog(
+    session: Session,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    val dateFormatter = DateTimeFormatter.ofPattern("MMM dd, yyyy")
+    val timeFormatter = DateTimeFormatter.ofPattern("HH:mm")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = Icons.Outlined.Delete,
+                    contentDescription = null,
+                    tint = Color.Red,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text("Delete Session", fontWeight = FontWeight.Bold, color = Color.Red)
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Are you sure you want to delete this session?",
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(Color.Red.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = dateFormatter.format(session.appointmentDate),
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = PsyMedColors.Primary
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "${timeFormatter.format(session.appointmentDate)} - ${session.sessionTime}h",
+                        style = MaterialTheme.typography.bodyMedium.copy(color = PsyMedColors.TextSecondary)
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "⚠️ This action cannot be undone.",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = Color.Red,
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        fontWeight = FontWeight.Medium
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+            ) {
+                Text("Delete", color = Color.White)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = PsyMedColors.TextSecondary)
+            }
+        }
     )
 }
 

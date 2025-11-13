@@ -150,6 +150,7 @@ fun PsyMedApp(
 
             ProfessionalPatientDetailScreen(
                 patientId = patientId,
+                authState = authState,
                 viewModel = patientsViewModel,
                 sessionsViewModel = sessionsViewModel,
                 medicationsViewModel = medicationsViewModel,
