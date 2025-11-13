@@ -44,7 +44,7 @@ fun PatientTasksScreen(
     onToggleStatus: (Task) -> Unit,
     onRefresh: () -> Unit
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = PsyMedColors.Background) {
+    Surface(modifier = modifier.fillMaxWidth(), color = PsyMedColors.Background) {
         when {
             uiState.isLoading -> TasksLoading()
             uiState.error != null -> TasksError(message = uiState.error!!, onRetry = onRefresh)

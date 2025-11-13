@@ -39,7 +39,7 @@ fun PatientMedicationScreen(
     uiState: MedicationsUiState,
     onRefresh: () -> Unit
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = PsyMedColors.Background) {
+    Surface(modifier = modifier.fillMaxWidth(), color = PsyMedColors.Background) {
         when {
             uiState.isLoading -> MedicationLoading()
             uiState.error != null -> MedicationError(message = uiState.error, onRetry = onRefresh)

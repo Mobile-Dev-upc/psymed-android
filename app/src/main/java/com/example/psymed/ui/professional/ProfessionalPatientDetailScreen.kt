@@ -6,10 +6,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -112,7 +111,9 @@ fun ProfessionalPatientDetailScreen(
             item {
                 SectionTitle("Appointments")
                 PatientAppointmentsScreen(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp),
                     uiState = sessionsState,
                     onRefresh = { sessionsViewModel.loadPatientSessions(patientId) }
                 )
@@ -120,7 +121,9 @@ fun ProfessionalPatientDetailScreen(
             item {
                 SectionTitle("Medications")
                 PatientMedicationScreen(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp),
                     uiState = medicationsState,
                     onRefresh = { medicationsViewModel.loadMedications(patientId) }
                 )
@@ -128,7 +131,9 @@ fun ProfessionalPatientDetailScreen(
             item {
                 SectionTitle("Tasks")
                 PatientTasksScreen(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp),
                     uiState = tasksState,
                     onToggleStatus = { task ->
                         tasksViewModel.toggleTaskStatus(task.sessionId, task) { _, _ -> }
@@ -139,7 +144,9 @@ fun ProfessionalPatientDetailScreen(
             item {
                 SectionTitle("Analytics")
                 PatientAnalyticsScreen(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp),
                     uiState = analyticsState,
                     onRefresh = {
                         val now = java.time.LocalDate.now()
