@@ -36,7 +36,7 @@ fun PatientAnalyticsScreen(
     uiState: AnalyticsUiState,
     onRefresh: () -> Unit
 ) {
-    Surface(modifier = modifier.fillMaxSize(), color = PsyMedColors.Background) {
+    Surface(modifier = modifier.fillMaxWidth(), color = PsyMedColors.Background) {
         when {
             uiState.isLoading -> AnalyticsLoading()
             uiState.moodStates.isEmpty() && uiState.biologicalFunctions.isEmpty() -> AnalyticsEmpty()
