@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Email
@@ -18,12 +20,17 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.LocationCity
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PersonOutline
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.Divider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -65,6 +72,7 @@ fun RegisterScreen(
     var username by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
     var confirmPassword by rememberSaveable { mutableStateOf("") }
+    var acceptedTerms by rememberSaveable { mutableStateOf(false) }
 
     var validationError by remember { mutableStateOf<String?>(null) }
 
@@ -91,7 +99,8 @@ fun RegisterScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 20.dp)
-                .padding(top = 16.dp, bottom = 32.dp),
+                .padding(top = 16.dp, bottom = 32.dp)
+                .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.Top
         ) {
             Text(
@@ -189,6 +198,14 @@ fun RegisterScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            TermsAndConditions(
+                accepted = acceptedTerms,
+                onAcceptedChange = { acceptedTerms = it },
+                isProfessional = true
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             PsyMedPrimaryButton(
                 text = "Register",
                 loading = uiState.isLoading,
@@ -202,7 +219,7 @@ fun RegisterScreen(
                     username,
                     password,
                     confirmPassword
-                ).all { it.isNotBlank() },
+                ).all { it.isNotBlank() } && acceptedTerms,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (password != confirmPassword) {
@@ -283,6 +300,118 @@ private fun InfoBanner() {
                 color = PsyMedColors.TextSecondary,
                 fontStyle = FontStyle.Italic
             )
+        )
+    }
+}
+
+@Composable
+private fun TermsAndConditions(
+    accepted: Boolean,
+    onAcceptedChange: (Boolean) -> Unit,
+    isProfessional: Boolean = false
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(
+                color = PsyMedColors.PrimaryLightest,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text(
+            text = "Terms and Conditions",
+            style = MaterialTheme.typography.titleMedium.copy(
+                color = PsyMedColors.Primary,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        
+        Text(
+            text = "By creating an account, you agree to the following:",
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = PsyMedColors.TextSecondary,
+                fontWeight = FontWeight.SemiBold
+            )
+        )
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TermItem(
+                text = "Data Collection: The application collects and stores personal information including your name, email address, and physical address."
+            )
+            TermItem(
+                text = "Health Data Tracking: ${if (isProfessional) "For patients you register, the app tracks" else "The app tracks"} mood states (emotional well-being on a 1-5 scale) and biological functions including hunger, hydration levels, sleep quality, and energy levels."
+            )
+            TermItem(
+                text = "Data Storage: All collected data is stored securely on our servers to provide you with health analytics and insights."
+            )
+            TermItem(
+                text = "No Advertising: This application does not display advertisements or sponsored content."
+            )
+            TermItem(
+                text = "Data Privacy: We do not sell, share, or distribute your personal information or health data to third parties."
+            )
+            if (isProfessional) {
+                TermItem(
+                    text = "Patient Management: As a professional, you will have access to manage and view your registered patients' health data for treatment purposes."
+                )
+            }
+            TermItem(
+                text = "Purpose: Your data is used solely to provide health monitoring services, generate analytics, and support your healthcare journey."
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onAcceptedChange(!accepted) },
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Start
+        ) {
+            Checkbox(
+                checked = accepted,
+                onCheckedChange = onAcceptedChange,
+                colors = CheckboxDefaults.colors(
+                    checkedColor = PsyMedColors.Primary,
+                    uncheckedColor = PsyMedColors.TextSecondary
+                )
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "I accept the terms and conditions",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = PsyMedColors.TextPrimary,
+                    fontWeight = FontWeight.Medium
+                ),
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+
+@Composable
+private fun TermItem(text: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Start,
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = "• ",
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = PsyMedColors.Primary,
+                fontWeight = FontWeight.Bold
+            )
+        )
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodySmall.copy(
+                color = PsyMedColors.TextSecondary
+            ),
+            modifier = Modifier.weight(1f)
         )
     }
 }
