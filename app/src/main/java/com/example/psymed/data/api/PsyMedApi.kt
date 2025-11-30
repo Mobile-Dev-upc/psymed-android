@@ -48,6 +48,9 @@ interface PsyMedApi {
     @GET("professional-profiles/account/{accountId}")
     suspend fun getProfessionalProfileByAccount(@Path("accountId") accountId: Int): ProfessionalProfileDto
 
+    @GET("professional-profiles/{professionalId}")
+    suspend fun getProfessionalProfileById(@Path("professionalId") professionalId: Int): ProfessionalProfileDto
+
     // Patient Profiles
     @POST("patient-profiles")
     suspend fun createPatientProfile(@Body request: PatientProfileRequestDto): PatientProfileDto

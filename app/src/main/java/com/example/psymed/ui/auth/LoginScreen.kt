@@ -1,5 +1,6 @@
 package com.example.psymed.ui.auth
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import com.example.psymed.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -77,21 +80,11 @@ fun LoginScreen(
         ) {
             Spacer(modifier = Modifier.height(24.dp))
 
-            Box(
-                modifier = Modifier
-                    .size(180.dp)
-                    .clip(CircleShape)
-                    .background(Color.White),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "PSYMED",
-                    style = MaterialTheme.typography.headlineMedium.copy(
-                        color = PsyMedColors.Primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                )
-            }
+            Image(
+                painter = painterResource(id = R.drawable.psymed_logo),
+                contentDescription = "PSYMED Logo",
+                modifier = Modifier.size(180.dp)
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
