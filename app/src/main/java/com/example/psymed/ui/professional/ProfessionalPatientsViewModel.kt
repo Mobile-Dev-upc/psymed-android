@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.psymed.data.repository.AuthRepository
 import com.example.psymed.domain.model.PatientProfile
 import com.example.psymed.domain.model.PatientSummary
+import com.example.psymed.domain.model.UpdatePatientProfileRequest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -75,6 +76,41 @@ class ProfessionalPatientsViewModel(
             }.onFailure { throwable ->
                 _uiState.update { it.copy(isLoading = false) }
                 onResult(false, throwable.message ?: "Failed to delete patient")
+            }
+        }
+    }
+
+    fun updatePatient(patientId: Int, request: UpdatePatientProfileRequest, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isLoading = true, error = null) }
+            runCatching {
+                authRepository.updatePatientProfile(patientId, request)
+            }.onSuccess { profile ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        selectedPatient = profile,
+                        error = null,
+                        // Update the patient in the list if it exists
+                        patients = it.patients.map { patient ->
+                            if (patient.id == patientId && profile != null) {
+                                PatientSummary(
+                                    id = profile.id,
+                                    fullName = profile.fullName,
+                                    email = profile.email,
+                                    streetAddress = profile.streetAddress,
+                                    accountId = profile.accountId
+                                )
+                            } else {
+                                patient
+                            }
+                        }
+                    )
+                }
+                onResult(profile != null, if (profile == null) "Failed to update patient" else null)
+            }.onFailure { throwable ->
+                _uiState.update { it.copy(isLoading = false) }
+                onResult(false, throwable.message ?: "Failed to update patient")
             }
         }
     }

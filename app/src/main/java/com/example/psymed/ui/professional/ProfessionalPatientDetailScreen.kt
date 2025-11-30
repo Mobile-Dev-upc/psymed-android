@@ -30,6 +30,8 @@ import androidx.compose.material.icons.outlined.Pending
 import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material.icons.outlined.TrendingUp
+import androidx.compose.material.icons.outlined.Mood
+import androidx.compose.material.icons.outlined.Favorite
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -83,6 +85,9 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeFormatter.ofPattern
+import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -111,6 +116,7 @@ fun ProfessionalPatientDetailScreen(
     val sessionsState by sessionsViewModel.uiState.collectAsStateWithLifecycle()
     val medicationsState by medicationsViewModel.uiState.collectAsStateWithLifecycle()
     val tasksState by tasksViewModel.uiState.collectAsStateWithLifecycle()
+    val analyticsState by analyticsViewModel.uiState.collectAsStateWithLifecycle()
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
@@ -190,7 +196,9 @@ fun ProfessionalPatientDetailScreen(
                     patient = patient,
                     sessionsCount = sessionsState.sessions.size,
                     medicationsCount = medicationsState.medications.size,
-                    tasksCount = tasksState.tasks.size
+                    tasksCount = tasksState.tasks.size,
+                    moodStates = analyticsState.moodStates,
+                    biologicalFunctions = analyticsState.biologicalFunctions
                 )
                 1 -> MedicationsTab(
                     patientId = patientId,
@@ -225,7 +233,9 @@ private fun InfoTab(
     patient: com.example.psymed.domain.model.PatientProfile?,
     sessionsCount: Int,
     medicationsCount: Int,
-    tasksCount: Int
+    tasksCount: Int,
+    moodStates: List<com.example.psymed.domain.model.MoodState>,
+    biologicalFunctions: List<com.example.psymed.domain.model.BiologicalFunctions>
 ) {
     LazyColumn(
         modifier = Modifier
@@ -253,6 +263,14 @@ private fun InfoTab(
                 sessionsCount = sessionsCount,
                 tasksCount = tasksCount
             )
+        }
+
+        item {
+            MoodStatisticsCard(moodStates = moodStates)
+        }
+
+        item {
+            BiologicalStatisticsCard(biologicalFunctions = biologicalFunctions)
         }
     }
 }
@@ -325,7 +343,7 @@ private fun StatisticsCard(
 ) {
     InfoCard(
         title = "Statistics",
-        icon = Icons.Outlined.Info
+        icon = Icons.Outlined.TrendingUp
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -380,6 +398,318 @@ private fun StatItem(
                 color = PsyMedColors.TextSecondary
             )
         )
+    }
+}
+
+@Composable
+private fun MoodStatisticsCard(
+    moodStates: List<com.example.psymed.domain.model.MoodState>
+) {
+    // Get last 7 days of mood data
+    val now = LocalDate.now()
+    val last7Days = moodStates.filter { mood ->
+        mood.recordedAt != null && 
+        !mood.recordedAt!!.isAfter(now) && 
+        ChronoUnit.DAYS.between(mood.recordedAt, now) <= 7
+    }.sortedByDescending { it.recordedAt }
+
+    InfoCard(
+        title = "Emotional State",
+        icon = Icons.Outlined.Mood
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.width(0.dp))
+            Box(
+                modifier = Modifier
+                    .background(
+                        PsyMedColors.PrimaryLightest,
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = "Last 7 days",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = PsyMedColors.Primary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (last7Days.isEmpty()) {
+            Text(
+                text = "No emotional state records yet",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = PsyMedColors.TextSecondary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 20.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        } else {
+            // Mood distribution
+            MoodDistribution(moods = last7Days)
+            Spacer(modifier = Modifier.height(16.dp))
+            // Recent moods list
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                last7Days.take(5).forEach { mood ->
+                    MoodItem(mood = mood)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoodDistribution(moods: List<com.example.psymed.domain.model.MoodState>) {
+    // Count each mood type
+    val moodCounts = mutableMapOf(1 to 0, 2 to 0, 3 to 0, 4 to 0, 5 to 0)
+    moods.forEach { mood ->
+        moodCounts[mood.mood] = (moodCounts[mood.mood] ?: 0) + 1
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(PsyMedColors.Background, RoundedCornerShape(8.dp))
+            .padding(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceAround
+        ) {
+            MoodCount(emoji = "😢", count = moodCounts[1] ?: 0, color = Color(0xFF2196F3))
+            MoodCount(emoji = "😕", count = moodCounts[2] ?: 0, color = Color(0xFF607D8B))
+            MoodCount(emoji = "😐", count = moodCounts[3] ?: 0, color = Color(0xFF9E9E9E))
+            MoodCount(emoji = "😊", count = moodCounts[4] ?: 0, color = Color(0xFFFF9800))
+            MoodCount(emoji = "😄", count = moodCounts[5] ?: 0, color = Color(0xFF4CAF50))
+        }
+    }
+}
+
+@Composable
+private fun MoodCount(emoji: String, count: Int, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = emoji, style = MaterialTheme.typography.headlineSmall)
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .background(color.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 8.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = count.toString(),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = color
+                )
+            )
+        }
+    }
+}
+
+@Composable
+private fun MoodItem(mood: com.example.psymed.domain.model.MoodState) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = mood.getMoodEmoji(),
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = mood.getMoodLabel(),
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.SemiBold,
+                    color = PsyMedColors.Primary
+                )
+            )
+            mood.recordedAt?.let { date ->
+                Text(
+                    text = date.format(ofPattern("MMM dd, yyyy")),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = PsyMedColors.TextSecondary
+                    )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BiologicalStatisticsCard(
+    biologicalFunctions: List<com.example.psymed.domain.model.BiologicalFunctions>
+) {
+    // Get current month data
+    val now = LocalDate.now()
+    val currentMonthData = biologicalFunctions.filter { bio ->
+        bio.recordedAt != null &&
+        bio.recordedAt!!.year == now.year &&
+        bio.recordedAt!!.month == now.month
+    }
+
+    // Calculate averages
+    val hungerAvg = if (currentMonthData.isNotEmpty()) {
+        currentMonthData.map { it.hunger }.average()
+    } else 0.0
+    val hydrationAvg = if (currentMonthData.isNotEmpty()) {
+        currentMonthData.map { it.hydration }.average()
+    } else 0.0
+    val sleepAvg = if (currentMonthData.isNotEmpty()) {
+        currentMonthData.map { it.sleep }.average()
+    } else 0.0
+    val energyAvg = if (currentMonthData.isNotEmpty()) {
+        currentMonthData.map { it.energy }.average()
+    } else 0.0
+
+    InfoCard(
+        title = "Physical State",
+        icon = Icons.Outlined.Favorite
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Spacer(modifier = Modifier.width(0.dp))
+            Box(
+                modifier = Modifier
+                    .background(
+                        PsyMedColors.Error.copy(alpha = 0.1f),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+            ) {
+                Text(
+                    text = now.format(ofPattern("MMM yyyy")),
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = PsyMedColors.Error,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
+        if (currentMonthData.isEmpty()) {
+            Text(
+                text = "No physical state records yet",
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    color = PsyMedColors.TextSecondary
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 20.dp),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                BiologicalIndicator(
+                    emoji = "🍽️",
+                    label = "Hunger",
+                    value = hungerAvg,
+                    color = Color(0xFFFF9800)
+                )
+                BiologicalIndicator(
+                    emoji = "💧",
+                    label = "Hydration",
+                    value = hydrationAvg,
+                    color = Color(0xFF2196F3)
+                )
+                BiologicalIndicator(
+                    emoji = "😴",
+                    label = "Sleep",
+                    value = sleepAvg,
+                    color = Color(0xFF3F51B5)
+                )
+                BiologicalIndicator(
+                    emoji = "⚡",
+                    label = "Energy",
+                    value = energyAvg,
+                    color = Color(0xFFFFEB3B)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(PsyMedColors.Background, RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "Based on ${currentMonthData.size} record${if (currentMonthData.size != 1) "s" else ""} this month",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = PsyMedColors.TextSecondary,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic
+                        ),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun BiologicalIndicator(
+    emoji: String,
+    label: String,
+    value: Double,
+    color: Color
+) {
+    val percentage = (value / 5.0).coerceIn(0.0, 1.0)
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = emoji,
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        color = PsyMedColors.Primary
+                    )
+                )
+                Text(
+                    text = "${String.format("%.1f", value)}/5.0",
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        color = color,
+                        fontWeight = FontWeight.Bold
+                    )
+                )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = percentage.toFloat(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = color,
+                trackColor = color.copy(alpha = 0.2f)
+            )
+        }
     }
 }
 

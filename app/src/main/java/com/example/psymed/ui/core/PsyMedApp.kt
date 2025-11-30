@@ -22,6 +22,7 @@ import com.example.psymed.ui.profile.PatientProfileScreen
 import com.example.psymed.ui.tasks.TasksViewModel
 import androidx.navigation.NavType
 import androidx.navigation.navArgument
+import com.example.psymed.ui.professional.EditPatientScreen
 import com.example.psymed.ui.professional.ProfessionalAddPatientScreen
 import com.example.psymed.ui.professional.ProfessionalHomeScreen
 import com.example.psymed.ui.professional.ProfessionalPatientDetailScreen
@@ -110,6 +111,9 @@ fun PsyMedApp(
                 onViewPatient = { patientId ->
                     navController.navigate("${Routes.ProfessionalPatientDetail}/$patientId")
                 },
+                onEditPatient = { patientId ->
+                    navController.navigate("${Routes.ProfessionalEditPatient}/$patientId")
+                },
                 onDeletePatient = { patientId ->
                     patientsViewModel.deletePatient(patientId) { _, _ -> }
                 },
@@ -125,6 +129,32 @@ fun PsyMedApp(
                         if (success) {
                             authState.professionalProfile?.id?.let { id ->
                                 patientsViewModel.loadPatients(id)
+                            }
+                        }
+                        callback(success, message)
+                    }
+                },
+                onClose = {
+                    navController.popBackStack()
+                }
+            )
+        }
+        composable(
+            route = "${Routes.ProfessionalEditPatient}/{patientId}",
+            arguments = listOf(
+                navArgument("patientId") { type = NavType.IntType }
+            )
+        ) { backStackEntry ->
+            val patientId = backStackEntry.arguments?.getInt("patientId") ?: return@composable
+            val patientsViewModel: ProfessionalPatientsViewModel = viewModel(factory = factory)
+            EditPatientScreen(
+                patientId = patientId,
+                viewModel = patientsViewModel,
+                onUpdatePatient = { id, request, callback ->
+                    patientsViewModel.updatePatient(id, request) { success, message ->
+                        if (success) {
+                            authState.professionalProfile?.id?.let { professionalId ->
+                                patientsViewModel.loadPatients(professionalId)
                             }
                         }
                         callback(success, message)

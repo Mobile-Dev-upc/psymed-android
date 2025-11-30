@@ -18,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Badge
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Email
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material.icons.outlined.Refresh
@@ -50,6 +51,7 @@ fun ProfessionalHomeScreen(
     viewModel: ProfessionalPatientsViewModel,
     onAddPatient: () -> Unit,
     onViewPatient: (Int) -> Unit,
+    onEditPatient: (Int) -> Unit,
     onDeletePatient: (Int) -> Unit,
     onLogout: () -> Unit
 ) {
@@ -113,6 +115,7 @@ fun ProfessionalHomeScreen(
             else -> ProfessionalPatientsList(
                 uiState = uiState,
                 onViewPatient = onViewPatient,
+                onEditPatient = onEditPatient,
                 onDeletePatient = onDeletePatient,
                 modifier = Modifier.padding(padding)
             )
@@ -191,6 +194,7 @@ private fun ProfessionalEmpty(modifier: Modifier = Modifier) {
 private fun ProfessionalPatientsList(
     uiState: ProfessionalPatientsUiState,
     onViewPatient: (Int) -> Unit,
+    onEditPatient: (Int) -> Unit,
     onDeletePatient: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -219,6 +223,13 @@ private fun ProfessionalPatientsList(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
+                    IconButton(onClick = { onEditPatient(patient.id) }) {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = "Edit patient",
+                            tint = PsyMedColors.Primary
+                        )
+                    }
                     IconButton(onClick = { onDeletePatient(patient.id) }) {
                         Icon(
                             imageVector = Icons.Outlined.Delete,

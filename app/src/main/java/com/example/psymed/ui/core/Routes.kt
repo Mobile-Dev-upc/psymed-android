@@ -9,6 +9,7 @@ object Routes {
 
     const val ProfessionalHome = "professional/home"
     const val ProfessionalAddPatient = "professional/add-patient"
+    const val ProfessionalEditPatient = "professional/edit-patient"
     const val ProfessionalPatientDetail = "professional/patient-detail"
 }
 
