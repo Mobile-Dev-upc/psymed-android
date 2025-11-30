@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "305725777898",
+    "project_id": "tests-1e009",
+    "storage_bucket": "tests-1e009.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:305725777898:android:db6df41440107263883493",
+        "android_client_info": {
+          "package_name": "com.example.psymed"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbO3wRKEmKLIdtb1hzHl7FCbXWY_1LK0c"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
